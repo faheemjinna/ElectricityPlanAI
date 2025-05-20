@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+
+# Downloaded files
+downloads/
+calculated/
+extracted_texts/
+
+# System/IDE files
+*.DS_Store
+*.log
+
+# Selenium and test artifacts
+*.side
+seleniumplan
+
+# PDFs and samples
+*.pdf
