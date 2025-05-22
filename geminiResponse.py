@@ -28,6 +28,7 @@ def geminiResponseGenerator(fileName):
     If the energy charge is flat (e.g., "All kWh"), set min to 0 and max to null, then provide the rate.
     If tiered, list each kWh range with min/max values and their corresponding rates.
     For open-ended ranges (e.g., "> 1000 kWh"), set max to null.
+    For the tiers, make sure that if the end range is defined, it is inclusive, and the next start value should be the previous end + 1.
     Description: Combine all key terms, discounts, and disclosures into a single string under description.
     Output format:
     {

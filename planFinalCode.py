@@ -10,9 +10,9 @@ from sql_config import DB_CONFIG
 from dotenv import load_dotenv
 import shutil
 import mysql.connector  # Ensure your DB imports are at the top
-
 from openpyxl import Workbook
 from openpyxl.styles import Font
+
 load_dotenv()
 
 # DB_Connection
@@ -87,15 +87,32 @@ def getOrCreatePlan(company, base, formula, tiers):
         print(f"Created new plan. Plan ID: {planid}")
         return planid
 
-def storePlanDetails(planid, companyid, planName, pdf_filename):
-    # Store plan_details in the database
+def storePlanDetails(planid, companyid, planName, typeInput):
     try:
+        # Check if the record already exists
         mycursor.execute("""
-            INSERT INTO plan_details (planID, plan_name, companyID)
-            VALUES (%s, %s, %s)
-        """, (planid, planName, companyid))
+            SELECT id FROM plan_details
+            WHERE plan_name = %s AND companyID = %s AND type = %s
+        """, (planName, companyid, typeInput))
+        result = mycursor.fetchone()
+
+        if result:
+            # Record exists, update the planID
+            mycursor.execute("""
+                UPDATE plan_details
+                SET planID = %s
+                WHERE id = %s
+            """, (planid, result['id']))
+            print(f"Updated planID for existing plan detail ID {result['id']}")
+        else:
+            # Record does not exist, insert new entry
+            mycursor.execute("""
+                INSERT INTO plan_details (planID, plan_name, companyID, type)
+                VALUES (%s, %s, %s, %s)
+            """, (planid, planName, companyid, typeInput))
+            print(f"Stored new plan details for plan ID {planid}")
+
         mydb.commit()
-        print(f"Stored plan details for plan ID {planid}")
     except mysql.connector.Error as err:
         print(f"Failed to store plan details: {err}")
 
@@ -240,7 +257,7 @@ if __name__ == "__main__":
                 result = mycursor.fetchone()
                 if result:
                     companyid = result['companyid']
-                    storePlanDetails(planid, companyid, planName, filename)
+                    storePlanDetails(planid, companyid, planName, typeInput)
 
             # Move PDF to calculated/
             dest_path = os.path.join(calculated_folder, filename)
@@ -287,8 +304,11 @@ if __name__ == "__main__":
     print(f"\n✅ Excel file saved to: {excel_path}")
 
     # Step 5: Print lowest total plan
-    lowest_plan = min(total_costs, key=total_costs.get)
-    print(f"\n🔻 Lowest Total Cost Plan: {lowest_plan} — ${round(total_costs[lowest_plan], 2)}")
+    if total_costs:
+        lowest_plan = min(total_costs, key=total_costs.get)
+        print(f"\n✅ Lowest total cost plan: {lowest_plan} - ${round(total_costs[lowest_plan], 2)}")
+    else:
+        print("\n⚠️ No plan costs found to evaluate the lowest plan.")
 
     # Cleanup
     mycursor.close()
