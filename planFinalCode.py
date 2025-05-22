@@ -4,8 +4,16 @@ import mysql.connector
 import logging
 import shutil
 import fitz
-import re
+from geminiResponse import geminiResponseGenerator
+import formulaLogic
 from sql_config import DB_CONFIG
+from dotenv import load_dotenv
+import shutil
+import mysql.connector  # Ensure your DB imports are at the top
+
+from openpyxl import Workbook
+from openpyxl.styles import Font
+load_dotenv()
 
 # DB_Connection
 mydb = mysql.connector.connect(**DB_CONFIG)
@@ -30,68 +38,17 @@ def extractPlanDetails(pdfPath):
     with open(textFileName, "w", encoding="utf-8") as f:
         f.write(fullPageText)
     
-    lines = fullPageText.split('\n')
+    response_json = geminiResponseGenerator(textFileName)
     
-    # Extract company name
-    # Assuming the company name is the first non-empty line after "Electricity Facts Label"
-    companyName = None
-    for i, line in enumerate(lines):
-        if "Electricity Facts Label" in line:
-            for j in range(i + 1, len(lines)):
-                if lines[j].strip():
-                    companyName = lines[j].strip()
-                    break
-            break
-
-    baseCharge = 0.0
-    baseChargePattern = re.compile(r'Base Charge:.*?\$?(\d+\.\d{2})', re.IGNORECASE | re.DOTALL)
-    baseChargeMatch = baseChargePattern.search(fullPageText)
-    if baseChargeMatch:
-        baseCharge = float(baseChargeMatch.group(1)) # Extract base charge from first group regex match
-    else:
-        for i, line in enumerate(lines):
-            if "Base Charge" in line:
-                for j in range(i + 1, len(lines)):
-                    amountMatch = re.search(r'\$?(\d+\.\d{2})', lines[j])
-                    if amountMatch:
-                        baseCharge = float(amountMatch.group(1))
-                        break
-                break
-
-    # creditMatch = re.search(r'Usage Credit.*?\$([\d.]+).*?when usage is (?:above or equal to|>=)\s*(\d+)', fullPageText, re.IGNORECASE)
-    # usageCredit = None
-    # if creditMatch:
-    #     usageCredit = {
-    #         'amount': float(creditMatch.group(1)),
-    #         'threshold': int(creditMatch.group(2))
-    #     }
-
-    tierMatches = re.findall(r'(?:All\s*kWh|(?:(\d+)\s*-\s*(\d+)|>\s*(\d+))\s*kWh)\s+([\d.]+)¢', fullPageText)
-    tiers = []
-    for m in tierMatches:
-        if m[0] and m[1]:
-            tiers.append({'min': int(m[0]), 'max': int(m[1]), 'rate': float(m[3])})
-        elif m[2]:
-            tiers.append({'min': int(m[2]) + 1, 'max': None, 'rate': float(m[3])})
-        else:
-            tiers.append({'min': 0, 'max': None, 'rate': float(m[3])})
-
+    # print(f"Response JSON: {response_json}")
+    
+   # Validate and extract expected fields
+    companyName = response_json.get("company_name", "")
+    baseCharge = float(response_json.get("base_price", 0.0))
+    tiers = response_json.get("tiers", [])
+    description = response_json.get("description", "")
+    
     return companyName, baseCharge, tiers
-
-def buildFormulaString(baseCharge, tiers):
-    formula = f"base"
-    for tier in tiers:
-        if tier['max'] is not None:
-            # usage = 600
-            #0-500 base + min(usage - 0, 500) * rate
-            formula += f" + min(max(usage - {tier['min'] - 1}, 0), {tier['max'] - tier['min'] + 1}) * {tier['rate']}"
-        else:
-            formula += f" + max(usage - {tier['min'] - 1}, 0) * {tier['rate']}"
-    return f"({formula}) / 100"
-
-def evaluateFormula(usage_kwh, baseCharge, formula_str):
-    localVariables = {'usage': usage_kwh, 'base': baseCharge*100, 'min': min, 'max': max}
-    return round(eval(formula_str, {}, localVariables), 2)
 
 def getOrCreatePlan(company, base, formula, tiers):
     # Get existing plan ID or create new one if doesn't exist
@@ -142,19 +99,26 @@ def storePlanDetails(planid, companyid, planName, pdf_filename):
     except mysql.connector.Error as err:
         print(f"Failed to store plan details: {err}")
 
-def getProviderLinks():
+def getProviderLinks(typeInput, companyInput):
     try:
-        query = "SELECT companyID, companyName, dataLink, type FROM providers WHERE dataLink IS NOT NULL"
-        mycursor.execute(query)
-        providers = mycursor.fetchall()       
+        query = """
+            SELECT p.companyID, p.companyName, p.dataLink, p.type
+            FROM providers p
+            JOIN company c ON p.companyName = c.companyName
+            WHERE p.dataLink IS NOT NULL
+              AND p.type = %s
+              AND c.companyid = %s
+        """
+        mycursor.execute(query, (typeInput, companyInput))
+        providers = mycursor.fetchall()
         return providers
-        
+
     except mysql.connector.Error as err:
         print(f"Database connection failed: {err}")
         raise
 
-def fetch_and_download_pdfs(download_dir):
-    providers = getProviderLinks()
+def fetch_and_download_pdfs(download_dir, typeInput, companyInput):
+    providers = getProviderLinks(typeInput, companyInput)
     if not providers:
         print("No providers with data links found in database")
         return []
@@ -228,54 +192,104 @@ def fetch_and_download_pdfs(download_dir):
         browser.close()
         return downloaded_files
 
-
 if __name__ == "__main__":
-    download_folder = os.path.join(os.path.dirname(__file__), "downloads")
-    downloaded_files = fetch_and_download_pdfs(download_folder)
-    usage_kwh = 397
+    # Step 1: Get user input
+    typeInput = input("Enter type (e.g., apartment): ").strip()
+    companyInput = int(input("Enter company ID: "))
+
+    usage_kwh = []
+    for i in range(1, 13):
+        usage = float(input(f"Enter usage for month {i} (kWh): "))
+        usage_kwh.append(usage)
+
+    # Step 2: Setup folders
+    base_folder = os.path.dirname(__file__)
+    download_folder = os.path.join(base_folder, "downloads")
+    calculated_folder = os.path.join(base_folder, "calculated")
+    sheet_folder = os.path.join(base_folder, "sheets")
+
+    os.makedirs(calculated_folder, exist_ok=True)
+    os.makedirs(sheet_folder, exist_ok=True)
+
+    # Step 3: Fetch files
+    downloaded_files = fetch_and_download_pdfs(download_folder, typeInput, companyInput)
+
+    plan_data = {}  # key = planName, value = [month1_estimate, month2_estimate, ..., month12_estimate]
 
     for file_info in downloaded_files:
-        pdfPath = file_info['path']
         planName = file_info['planName']
         companyName = file_info['companyName']
+        pdfPath = file_info['path']
         filename = os.path.basename(pdfPath)
-        
+
         try:
             company, base, tiers = extractPlanDetails(pdfPath)
-            formula = buildFormulaString(base, tiers)
-            estimated_bill = evaluateFormula(usage_kwh, base, formula)
-            avg_rate = round((estimated_bill / usage_kwh) * 100, 2)
+            formula = formulaLogic.buildFormulaString(base, tiers)
 
-            print(f"\nProcessing: {filename}")
-            print(f"Company: {company}")
-            print(f"Plan Name: {planName}")
-            print(f"Base Charge: ${base}")
-            print(f"Tiers: {tiers}")
-            print(f"Formula: {formula}")
-            print(f"Estimated Bill for {usage_kwh} kWh: ${estimated_bill}")
-            print(f"Average Rate: {avg_rate}¢/kWh")
+            monthly_estimates = []
+            for usage in usage_kwh:
+                estimated_bill = formulaLogic.evaluateFormula(usage, base, formula)
+                monthly_estimates.append(round(estimated_bill, 2))
 
-            # Get or create plan and get plan ID
+            plan_data[planName] = monthly_estimates
+
+            # Store to DB
             planid = getOrCreatePlan(company, base, formula, tiers)
-            
             if planid:
-                # Get company ID
                 mycursor.execute("SELECT companyid FROM company WHERE companyname = %s", (company,))
-                company_result = mycursor.fetchone()
-                if company_result:
-                    companyid = company_result['companyid']
-                    # Store plan details
+                result = mycursor.fetchone()
+                if result:
+                    companyid = result['companyid']
                     storePlanDetails(planid, companyid, planName, filename)
-                else:
-                    print(f"Company not found: {company}")
 
-            # Move processed file
-            dest_path = os.path.join(calculatedFolder, filename)
+            # Move PDF to calculated/
+            dest_path = os.path.join(calculated_folder, filename)
             shutil.move(pdfPath, dest_path)
-            print(f"Moved to: {dest_path}")
 
         except Exception as e:
             print(f"Error processing {filename}: {e}")
 
+    # Step 4: Write to Excel
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Estimated Bills"
+
+    # Header Row
+    header = ["Month", "Usage (kWh)"] + list(plan_data.keys())
+    sheet.append(header)
+
+    # 12 Months Data
+    for month_idx in range(12):
+        row = [f"Month {month_idx + 1}", usage_kwh[month_idx]]
+        for plan in plan_data:
+            row.append(plan_data[plan][month_idx])
+        sheet.append(row)
+
+    # Total Row
+    total_row = ["Total", ""]
+    total_costs = {}
+    for plan in plan_data:
+        total = sum(plan_data[plan])
+        total_costs[plan] = total
+        total_row.append(round(total, 2))
+    sheet.append(total_row)
+    
+    # Empty Row for spacing
+    sheet.append([""] * len(header))
+    
+    # Bold headers and total
+    for cell in sheet[1] + sheet[sheet.max_row]:
+        cell.font = Font(bold=True)
+
+    # Save Excel file
+    excel_path = os.path.join(sheet_folder, "estimated_bills.xlsx")
+    workbook.save(excel_path)
+    print(f"\n✅ Excel file saved to: {excel_path}")
+
+    # Step 5: Print lowest total plan
+    lowest_plan = min(total_costs, key=total_costs.get)
+    print(f"\n🔻 Lowest Total Cost Plan: {lowest_plan} — ${round(total_costs[lowest_plan], 2)}")
+
+    # Cleanup
     mycursor.close()
     mydb.close()
