@@ -23,6 +23,11 @@ mycursor = mydb.cursor(dictionary=True)
 downloadsFolder = "downloads"
 calculatedFolder = "calculated"
 textOutputFolder = "extracted_texts"
+base_folder = os.path.dirname(__file__)
+download_folder = os.path.join(base_folder, "downloads")
+calculated_folder = os.path.join(base_folder, "calculated")
+sheet_folder = os.path.join(base_folder, "sheets")
+
 os.makedirs(downloadsFolder, exist_ok=True)
 os.makedirs(textOutputFolder, exist_ok=True)
 os.makedirs(calculatedFolder, exist_ok=True)
@@ -89,7 +94,7 @@ def getOrCreatePlan(company, base, formula, tiers):
 
 def storePlanDetails(planid, companyid, planName, typeInput):
     try:
-        # Check if the record already exists
+        # Check for existing record with same plan name, company ID, and type
         mycursor.execute("""
             SELECT id FROM plan_details
             WHERE plan_name = %s AND companyID = %s AND type = %s
@@ -97,24 +102,25 @@ def storePlanDetails(planid, companyid, planName, typeInput):
         result = mycursor.fetchone()
 
         if result:
-            # Record exists, update the planID
+            # Record exists — update with new planID
             mycursor.execute("""
                 UPDATE plan_details
                 SET planID = %s
                 WHERE id = %s
             """, (planid, result['id']))
-            print(f"Updated planID for existing plan detail ID {result['id']}")
+            print(f"✅ Updated existing plan detail (ID: {result['id']}) with new planID {planid}")
         else:
-            # Record does not exist, insert new entry
+            # Insert new record
             mycursor.execute("""
                 INSERT INTO plan_details (planID, plan_name, companyID, type)
                 VALUES (%s, %s, %s, %s)
             """, (planid, planName, companyid, typeInput))
-            print(f"Stored new plan details for plan ID {planid}")
+            print(f"✅ Inserted new plan details for planID {planid}")
 
         mydb.commit()
+
     except mysql.connector.Error as err:
-        print(f"Failed to store plan details: {err}")
+        print(f"❌ Failed to store plan details: {err}")
 
 def getProviderLinks(typeInput, companyInput):
     try:
@@ -209,29 +215,15 @@ def fetch_and_download_pdfs(download_dir, typeInput, companyInput):
         browser.close()
         return downloaded_files
 
-if __name__ == "__main__":
-    # Step 1: Get user input
-    typeInput = input("Enter type (e.g., apartment): ").strip()
-    companyInput = int(input("Enter company ID: "))
-
-    usage_kwh = []
-    for i in range(1, 13):
-        usage = float(input(f"Enter usage for month {i} (kWh): "))
-        usage_kwh.append(usage)
-
+def fetchLatestData(plan_data):
     # Step 2: Setup folders
-    base_folder = os.path.dirname(__file__)
-    download_folder = os.path.join(base_folder, "downloads")
-    calculated_folder = os.path.join(base_folder, "calculated")
-    sheet_folder = os.path.join(base_folder, "sheets")
-
     os.makedirs(calculated_folder, exist_ok=True)
     os.makedirs(sheet_folder, exist_ok=True)
 
     # Step 3: Fetch files
     downloaded_files = fetch_and_download_pdfs(download_folder, typeInput, companyInput)
 
-    plan_data = {}  # key = planName, value = [month1_estimate, month2_estimate, ..., month12_estimate]
+    # plan_data = {}  # key = planName, value = [month1_estimate, month2_estimate, ..., month12_estimate]
 
     for file_info in downloaded_files:
         planName = file_info['planName']
@@ -265,7 +257,44 @@ if __name__ == "__main__":
 
         except Exception as e:
             print(f"Error processing {filename}: {e}")
+            
+def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
+    
+    plan_data = {}  # key = planName, value = [month1_estimate, month2_estimate, ..., month12_estimate]
+    
+    if loadLatest:
+        fetchLatestData(plan_data)
+    else:
+        mycursor.execute("""
+    SELECT 
+        c.companyname, 
+        p.planID, 
+        p.baseAmount, 
+        p.formula, 
+        pd.plan_name
+    FROM electricity_plans.plan_details pd
+    JOIN electricity_plans.company c 
+        ON pd.companyID = c.companyid
+    JOIN electricity_plans.plans p 
+        ON p.planID = pd.planID
+    WHERE pd.type = %s
+      AND pd.companyID = %s
+    GROUP BY p.planID
+""", (typeInput, companyInput))
+        rows = mycursor.fetchall()
+        for row in rows:
+            planName = row['plan_name']
+            baseAmount = float(row['baseAmount'])
+            formula = row['formula']
+            print(f"Processing plan: {planName}, Base Amount: {baseAmount}, Formula: {formula}")
 
+            monthly_estimates = []
+            for usage in usage_kwh:
+                estimated_bill = formulaLogic.evaluateFormula(float(usage), baseAmount, formula)
+                monthly_estimates.append(round(estimated_bill, 2))
+
+            plan_data[planName] = monthly_estimates
+            
     # Step 4: Write to Excel
     workbook = Workbook()
     sheet = workbook.active
@@ -313,3 +342,26 @@ if __name__ == "__main__":
     # Cleanup
     mycursor.close()
     mydb.close()
+
+# def setUserData(typeInput, companyInput, loadLatest, usage_kwh):
+    # typeInput = "apartment"  # Example input
+    # companyInput = 2  # Example company ID
+    # loadLatest = True  # Example flag to load latest data
+    # usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
+    
+if __name__ == "__main__":
+    # Step 1: Get user input
+    # typeInput = input("Enter type (e.g., apartment): ").strip()
+    # companyInput = int(input("Enter company ID: "))
+
+    # usage_kwh = []
+    # for i in range(1, 13):
+    #     usage = float(input(f"Enter usage for month {i} (kWh): "))
+    #     usage_kwh.append(usage)
+
+    typeInput = "apartment"  # Example input
+    companyInput = 2  # Example company ID
+    loadLatest = False  # Example flag to load latest data
+    usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
+    processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)
+    print("\n✅ Processing complete.") 
