@@ -6,7 +6,7 @@ import shutil
 import fitz
 from geminiResponse import geminiResponseGenerator
 import formulaLogic
-from sql_config import DB_CONFIG
+from dbConfigDetails import DB_CONFIG
 from dotenv import load_dotenv
 import shutil
 import mysql.connector  # Ensure your DB imports are at the top

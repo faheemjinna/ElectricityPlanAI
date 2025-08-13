@@ -1,45 +1,48 @@
-from flask import Flask
-from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
-import mysql.connector
-from sql_config import DB_CONFIG
-from datetime import datetime
+from flask import Flask, jsonify, request
+import mysql.connector  # Ensure your DB imports are at the top
+import planFinalCodeUpdated
+from dbConfigDetails import DB_CONFIG
 
 app = Flask(__name__)
-api = Api(app)
 
-# DB Connection
+# DB_Connection
 mydb = mysql.connector.connect(**DB_CONFIG)
 mycursor = mydb.cursor(dictionary=True)
 
-# Argument parser for POST/PUT if needed
-user_args = reqparse.RequestParser()
-user_args.add_argument('name', type=str, required=True, help='Name cannot be blank')
-user_args.add_argument('email', type=str, required=True, help='Email cannot be blank')
-
-# Helper to serialize datetime
-def serialize_result(rows):
-    for row in rows:
-        for key, value in row.items():
-            if isinstance(value, datetime):
-                row[key] = value.isoformat()
-    return rows
-
-class ProviderList(Resource):
-    def get(self):
-        try:
-            query = "SELECT * FROM providers"
-            mycursor.execute(query)
-            result = mycursor.fetchall()
-            result = serialize_result(result)
-            return {'providers': result}, 200
-        except Exception as e:
-            return {'error': str(e)}, 500
-
-api.add_resource(ProviderList, "/providers")
-
+#Routes
 @app.route('/')
 def home():
-    return "<h1>Hello, World!</h1>"
+    return "Welcome to the Electricity Plan AI"
+
+@app.route('/about')
+def about():
+    return "About the Electricity Plan AI"
+
+@app.route('/company', methods=['GET'])
+def get_companies():
+    try:
+        mycursor.execute("SELECT * FROM company")
+        result = mycursor.fetchall()
+        return jsonify(result)
+    except mysql.connector.Error as err:
+        return jsonify({"error": str(err)}), 500
+
+@app.route('/company/<int:company_id>', methods=['GET'])
+def get_company(company_id):
+    try:
+        mycursor.execute("SELECT * FROM company WHERE companyid = %s", (company_id,))
+        result = mycursor.fetchall()
+        return jsonify(result)
+    except mysql.connector.Error as err:
+        return jsonify({"error": str(err)}), 404
+
+@app.route('/updatedata', methods=['POST'])
+def updatedata():
+    try:
+        planFinalCodeUpdated.fetchLatestData()  # Call the function
+        return jsonify({"message": "Task completed successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
