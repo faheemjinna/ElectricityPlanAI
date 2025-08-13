@@ -215,7 +215,51 @@ def fetch_and_download_pdfs(download_dir, typeInput, companyInput):
         browser.close()
         return downloaded_files
 
-def fetchLatestData(plan_data):
+# def fetchLatestData(plan_data):
+#     # Step 2: Setup folders
+#     os.makedirs(calculated_folder, exist_ok=True)
+#     os.makedirs(sheet_folder, exist_ok=True)
+
+#     # Step 3: Fetch files
+#     downloaded_files = fetch_and_download_pdfs(download_folder, typeInput, companyInput)
+
+#     # plan_data = {}  # key = planName, value = [month1_estimate, month2_estimate, ..., month12_estimate]
+
+#     for file_info in downloaded_files:
+#         planName = file_info['planName']
+#         companyName = file_info['companyName']
+#         pdfPath = file_info['path']
+#         filename = os.path.basename(pdfPath)
+
+#         try:
+#             company, base, tiers = extractPlanDetails(pdfPath)
+#             formula = formulaLogic.buildFormulaString(base, tiers)
+
+#             monthly_estimates = []
+#             for usage in usage_kwh:
+#                 estimated_bill = formulaLogic.evaluateFormula(usage, base, formula)
+#                 monthly_estimates.append(round(estimated_bill, 2))
+
+#             plan_data[planName] = monthly_estimates
+
+#             # Store to DB
+#             planid = getOrCreatePlan(company, base, formula, tiers)
+#             if planid:
+#                 mycursor.execute("SELECT companyid FROM company WHERE companyname = %s", (company,))
+#                 result = mycursor.fetchone()
+#                 if result:
+#                     companyid = result['companyid']
+#                     storePlanDetails(planid, companyid, planName, typeInput)
+
+#             # Move PDF to calculated/
+#             dest_path = os.path.join(calculated_folder, filename)
+#             shutil.move(pdfPath, dest_path)
+
+#         except Exception as e:
+#             print(f"Error processing {filename}: {e}")
+
+
+def fetchLatestData():
     # Step 2: Setup folders
     os.makedirs(calculated_folder, exist_ok=True)
     os.makedirs(sheet_folder, exist_ok=True)
@@ -234,13 +278,6 @@ def fetchLatestData(plan_data):
         try:
             company, base, tiers = extractPlanDetails(pdfPath)
             formula = formulaLogic.buildFormulaString(base, tiers)
-
-            monthly_estimates = []
-            for usage in usage_kwh:
-                estimated_bill = formulaLogic.evaluateFormula(usage, base, formula)
-                monthly_estimates.append(round(estimated_bill, 2))
-
-            plan_data[planName] = monthly_estimates
 
             # Store to DB
             planid = getOrCreatePlan(company, base, formula, tiers)

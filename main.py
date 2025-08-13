@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 import mysql.connector  # Ensure your DB imports are at the top
+import planFinalCodeUpdated
 from sql_config import DB_CONFIG
 
 app = Flask(__name__)
@@ -35,8 +36,13 @@ def get_company(company_id):
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 404
 
-
-
+@app.route('/updatedata', methods=['POST'])
+def updatedata():
+    try:
+        planFinalCodeUpdated.fetchLatestData()  # Call the function
+        return jsonify({"message": "Task completed successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
