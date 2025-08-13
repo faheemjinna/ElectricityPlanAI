@@ -39,7 +39,9 @@ def get_company(company_id):
 @app.route('/updatedata', methods=['POST'])
 def updatedata():
     try:
-        planFinalCodeUpdated.fetchLatestData()  # Call the function
+        typeInput = request.args.get('type_input')
+        companyInput = request.args.get('company_input')
+        planFinalCodeUpdated.fetchLatestData(typeInput, companyInput)  # Call the function
         return jsonify({"message": "Task completed successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
