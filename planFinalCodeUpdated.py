@@ -336,25 +336,25 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
     mycursor.close()
     mydb.close()
 
-# def setUserData(typeInput, companyInput, loadLatest, usage_kwh):
+# def setUserData(typeInput, companyInput, loadLatest, usageInputArray):
     # typeInput = "apartment"  # Example input
     # companyInput = 2  # Example company ID
     # loadLatest = True  # Example flag to load latest data
-    # usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
+    # usageInputArray = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
     
 if __name__ == "__main__":
     # Step 1: Get user input
     # typeInput = input("Enter type (e.g., apartment): ").strip()
     # companyInput = int(input("Enter company ID: "))
 
-    # usage_kwh = []
+    # usageInputArray = []
     # for i in range(1, 13):
     #     usage = float(input(f"Enter usage for month {i} (kWh): "))
-    #     usage_kwh.append(usage)
+    #     usageInputArray.append(usage)
 
     typeInput = "apartment"  # Example input
     companyInput = 2  # Example company ID
     loadLatest = False  # Example flag to load latest data
-    usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
-    processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)
+    usageInputArray = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
+    processEnergyEstimates(typeInput, companyInput, usageInputArray, loadLatest)
     print("\n✅ Processing complete.") 

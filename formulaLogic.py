@@ -8,6 +8,6 @@ def buildFormulaString(baseCharge, tiers):
             formula += f" + max(usage - {tier['min'] - 1}, 0) * {rate}"
     return f"({formula}) / 100"
 
-def evaluateFormula(usage_kwh, baseCharge, formula_str):
-    localVariables = {'usage': usage_kwh, 'base': baseCharge*100, 'min': min, 'max': max}
+def evaluateFormula(usageInputArray, baseCharge, formula_str):
+    localVariables = {'usage': usageInputArray, 'base': baseCharge*100, 'min': min, 'max': max}
     return round(eval(formula_str, {}, localVariables), 2)

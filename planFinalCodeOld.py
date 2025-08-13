@@ -210,7 +210,7 @@ def fetch_and_download_pdfs(download_dir, typeInput, companyInput):
         browser.close()
         return downloaded_files
 
-def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
+def processEnergyEstimates(typeInput, companyInput, usageInputArray, loadLatest):
     # Step 1: Setup folders
     base_folder = os.path.dirname(__file__)
     download_folder = os.path.join(base_folder, "downloads")
@@ -239,7 +239,7 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
 
                 monthly_estimates = [
                     round(formulaLogic.evaluateFormula(usage, base, formula), 2)
-                    for usage in usage_kwh
+                    for usage in usageInputArray
                 ]
 
                 plan_data[planName] = monthly_estimates
@@ -279,7 +279,7 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
 
             monthly_estimates = [
                 round(formulaLogic.evaluateFormula(usage, base, formula), 2)
-                for usage in usage_kwh
+                for usage in usageInputArray
             ]
 
             plan_data[planName] = monthly_estimates
@@ -295,7 +295,7 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
 
     # Monthly data
     for month_idx in range(12):
-        row = [f"Month {month_idx + 1}", usage_kwh[month_idx]]
+        row = [f"Month {month_idx + 1}", usageInputArray[month_idx]]
         for plan in plan_data:
             row.append(plan_data[plan][month_idx])
         sheet.append(row)
@@ -337,14 +337,14 @@ if __name__ == "__main__":
     # typeInput = input("Enter type (e.g., apartment): ").strip()
     # companyInput = int(input("Enter company ID: "))
 
-    # usage_kwh = []
+    # usageInputArray = []
     # for i in range(1, 13):
     #     usage = float(input(f"Enter usage for month {i} (kWh): "))
-    #     usage_kwh.append(usage)
+    #     usageInputArray.append(usage)
 
     typeInput = "apartment"  # Example input
     companyInput = 2  # Example company ID
     loadLatest = False  # Example flag to load latest data
-    usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
-    processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)
+    usageInputArray = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]  # Example usage for 12 months
+    processEnergyEstimates(typeInput, companyInput, usageInputArray, loadLatest)
     print("\n✅ Processing complete.")
