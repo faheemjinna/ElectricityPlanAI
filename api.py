@@ -52,7 +52,9 @@ def getestimate():
         typeInput = request.args.get('type_input')
         companyInput = request.args.get('company_input')
         usage_str = request.args.get('usage')
+        print(f"Usage string received: {usage_str}")  # Debugging line
         usage_kwh = [int(x) for x in usage_str.split(",") if x]
+
         
         loadLatest = False
         return planFinalCodeUpdated.processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)  # Call the function
