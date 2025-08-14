@@ -12,6 +12,7 @@ import shutil
 import mysql.connector  # Ensure your DB imports are at the top
 from openpyxl import Workbook
 from openpyxl.styles import Font
+from flask import jsonify
 
 load_dotenv()
 
@@ -288,53 +289,27 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
 
             plan_data[planName] = monthly_estimates
             
-    # Step 4: Write to Excel
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Estimated Bills"
+    # Build structured response
+    plans_list = []
 
-    # Header Row
-    header = ["Month", "Usage (kWh)"] + list(plan_data.keys())
-    sheet.append(header)
+    for plan_full_name, monthly_costs in plan_data.items():
+        # Split into company and plan name
+        plan_info = {
+            "company": companyInput,
+            "plan_name": plan_full_name,
+            # "usage_kwh": usage_kwh,
+            "months": [
+                {"month": f"Month {i+1}", "amount": monthly_costs[i]}
+                for i in range(len(monthly_costs))
+            ],
+            "total": round(sum(monthly_costs), 2)
+        }
+        plans_list.append(plan_info)
 
-    # 12 Months Data
-    for month_idx in range(12):
-        row = [f"Month {month_idx + 1}", usage_kwh[month_idx]]
-        for plan in plan_data:
-            row.append(plan_data[plan][month_idx])
-        sheet.append(row)
-
-    # Total Row
-    total_row = ["Total", ""]
-    total_costs = {}
-    for plan in plan_data:
-        total = sum(plan_data[plan])
-        total_costs[plan] = total
-        total_row.append(round(total, 2))
-    sheet.append(total_row)
-    
-    # Empty Row for spacing
-    sheet.append([""] * len(header))
-    
-    # Bold headers and total
-    for cell in sheet[1] + sheet[sheet.max_row]:
-        cell.font = Font(bold=True)
-
-    # Save Excel file
-    excel_path = os.path.join(sheet_folder, "estimated_bills.xlsx")
-    workbook.save(excel_path)
-    print(f"\n✅ Excel file saved to: {excel_path}")
-
-    # Step 5: Print lowest total plan
-    if total_costs:
-        lowest_plan = min(total_costs, key=total_costs.get)
-        print(f"\n✅ Lowest total cost plan: {lowest_plan} - ${round(total_costs[lowest_plan], 2)}")
-    else:
-        print("\n⚠️ No plan costs found to evaluate the lowest plan.")
-
-    # Cleanup
-    mycursor.close()
-    mydb.close()
+    return jsonify({
+        "status": "success",
+        "plans": plans_list
+    })
 
 # def setUserData(typeInput, companyInput, loadLatest, usageInputArray):
     # typeInput = "apartment"  # Example input

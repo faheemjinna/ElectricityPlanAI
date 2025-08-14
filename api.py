@@ -46,5 +46,17 @@ def updatedata():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/getestimate', methods=['GET'])
+def getestimate():
+    try:
+        typeInput = request.args.get('type_input')
+        companyInput = request.args.get('company_input')
+        usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]
+        loadLatest = False
+        return planFinalCodeUpdated.processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)  # Call the function
+        # return jsonify({"message": "Task completed successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
