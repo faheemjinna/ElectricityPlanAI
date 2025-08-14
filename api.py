@@ -51,7 +51,9 @@ def getestimate():
     try:
         typeInput = request.args.get('type_input')
         companyInput = request.args.get('company_input')
-        usage_kwh = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650]
+        usage_str = request.args.get('usage')
+        usage_kwh = [int(x) for x in usage_str.split(",") if x]
+        
         loadLatest = False
         return planFinalCodeUpdated.processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest)  # Call the function
         # return jsonify({"message": "Task completed successfully"}), 200
