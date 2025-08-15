@@ -298,10 +298,10 @@ def processEnergyEstimates(typeInput, companyInput, usage_kwh, loadLatest):
             "company": companyInput,
             "plan_name": plan_full_name,
             # "usage_kwh": usage_kwh,
-            "months": [
-                {"month": f"Month {i+1}", "amount": monthly_costs[i]}
-                for i in range(len(monthly_costs))
-            ],
+            # "months": [
+            #     {"month": f"Month {i+1}", "amount": monthly_costs[i]}
+            #     for i in range(len(monthly_costs))
+            # ],
             "total": round(sum(monthly_costs), 2)
         }
         plans_list.append(plan_info)
